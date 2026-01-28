@@ -6,7 +6,6 @@ from typing import List
 from enum import Enum
 from app.database import SessionDep
 
-router = APIRouter()
 
 class AnimalStatus(str, Enum):
     available = "available"
@@ -28,15 +27,19 @@ class Animal(SQLModel, table=True):
     homeTrained: bool
     availableForAdoption: AnimalStatus = Field(default=AnimalStatus.available)
 
+router = APIRouter(
+    prefix="/animals",
+    tags=["animals"],
+)
 
 
-@router.get("/animals")
+@router.get("/")
 async def read_animals(session: SessionDep):
     animals = session.exec(select(Animal)).all()
     return {"animals": animals}
 
 
-@router.get("/animals/{animal_id}")
+@router.get("/{animal_id}")
 async def read_animal(animal_id: int, session: SessionDep):
     animal = session.get(Animal, animal_id)
     if not animal:
@@ -44,7 +47,7 @@ async def read_animal(animal_id: int, session: SessionDep):
     return animal
 
 
-@router.post("/animals")
+@router.post("/")
 async def create_animal(animal: Animal, session: SessionDep): 
 
     for field, value in animal.dict().items():
@@ -63,7 +66,7 @@ async def create_animal(animal: Animal, session: SessionDep):
 
     return {"success": "Animal created successfully"}
 
-@router.put("/animals/{animal_id}")
+@router.put("/{animal_id}")
 async def update_animal(animal_id: int, updated_animal: Animal, session: SessionDep):
     animal = session.get(Animal, animal_id)
     if not animal:
@@ -84,7 +87,7 @@ async def update_animal(animal_id: int, updated_animal: Animal, session: Session
 
     return {"success": "Animal updated successfully"}
 
-@router.delete("/animals/{animal_id}")
+@router.delete("/{animal_id}")
 async def delete_animal(animal_id: int, session: SessionDep):
     animal = session.get(Animal, animal_id)
     if not animal:
