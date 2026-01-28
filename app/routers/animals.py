@@ -1,8 +1,17 @@
 from fastapi import APIRouter, HTTPException
 from sqlmodel import SQLModel, Field, select
+from sqlalchemy import Column, String
+from sqlalchemy.dialects.postgresql import ARRAY
+from typing import List
+from enum import Enum
 from app.database import SessionDep
 
 router = APIRouter()
+
+class AnimalStatus(str, Enum):
+    available = "available"
+    pending = "pending"
+    adopted = "adopted"
 
 class Animal(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -17,7 +26,7 @@ class Animal(SQLModel, table=True):
     goodWithKids: bool
     goodWithDogs: bool
     homeTrained: bool
-    availableForAdoption: str 
+    availableForAdoption: AnimalStatus = Field(default=AnimalStatus.available)
 
 
 
