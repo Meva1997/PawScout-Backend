@@ -29,6 +29,7 @@ class Volunteer(SQLModel, table=True):
     emergencyContactPhone: str
     status: VolunteerStatus = Field(default=VolunteerStatus.pending)
     privacyAgreement: bool = Field(default=False)
+    date: str
 
  
 def existing_volunteer_email(session: SessionDep, email: str) -> bool:
@@ -43,7 +44,7 @@ def volunteer_not_found(session: SessionDep, volunteer_id: int) -> None:
     volunteer = session.get(Volunteer, volunteer_id)
     if not volunteer:
         raise HTTPException(status_code=404, detail="Volunteer not found")
-
+ 
 
 
 @router.post("/volunteers")
@@ -120,3 +121,14 @@ async def update_volunteer(volunteer_id: int, updated_volunteer: Volunteer, sess
     session.refresh(volunteer)
 
     return {"success": "Volunteer updated successfully"}
+
+@router.delete("/volunteers/{volunteer_id}")
+async def delete_volunteer(volunteer_id: int, session: SessionDep):
+    volunteer = session.get(Volunteer, volunteer_id)
+
+    volunteer_not_found(session, volunteer_id)
+
+    session.delete(volunteer)
+    session.commit()
+
+    return {"success": "Volunteer form deleted successfully"}
