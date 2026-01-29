@@ -1,35 +1,41 @@
 from typing import List
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
+from pydantic import EmailStr
 from sqlmodel import SQLModel, Field, select
 from sqlalchemy import Column, String
 from sqlalchemy.dialects.postgresql import ARRAY
 from enum import Enum
 from app.database import SessionDep
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/volunteer",
+    tags=["volunteer"],
+)
 
 class VolunteerStatus(str, Enum):
+    """Status options for volunteer applications."""
     pending = "pending"
     accepted = "accepted"
     rejected = "rejected"
 
 
 class Volunteer(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True, index=True, unique=True)
-    name: str
-    lastName: str
-    email: str = Field(index=True, unique=True)
-    phone: str
-    availability: List[str] = Field(sa_column=Column(ARRAY(String)))
-    availableDays: List[str] = Field(sa_column=Column(ARRAY(String)))
-    areasOfInterest: List[str] = Field(sa_column=Column(ARRAY(String)))
-    whyVolunteer: str
-    specialSkills: str
-    emergencyContactName: str
-    emergencyContactPhone: str
-    status: VolunteerStatus = Field(default=VolunteerStatus.pending)
-    privacyAgreement: bool = Field(default=False)
-    date: str
+    """Volunteer application model for managing volunteer registrations."""
+    id: int | None = Field(default=None, primary_key=True, index=True, unique=True)
+    name: str = Field(min_length=1, max_length=100, description="Volunteer's first name")
+    lastName: str = Field(min_length=1, max_length=100, description="Volunteer's last name")
+    email: EmailStr = Field(index=True, unique=True, description="Volunteer's email address")
+    phone: str = Field(min_length=7, max_length=20, description="Volunteer's phone number")
+    availability: List[str] = Field(sa_column=Column(ARRAY(String)), description="Time availability (e.g., weekdays, weekends)")
+    availableDays: List[str] = Field(sa_column=Column(ARRAY(String)), description="Specific days available")
+    areasOfInterest: List[str] = Field(sa_column=Column(ARRAY(String)), description="Areas of interest for volunteering")
+    whyVolunteer: str = Field(min_length=10, max_length=1000, description="Reason for wanting to volunteer")
+    specialSkills: str = Field(min_length=1, max_length=500, description="Special skills or qualifications")
+    emergencyContactName: str = Field(min_length=1, max_length=100, description="Emergency contact name")
+    emergencyContactPhone: str = Field(min_length=7, max_length=20, description="Emergency contact phone number")
+    status: VolunteerStatus = Field(default=VolunteerStatus.pending, description="Application status")
+    privacyAgreement: bool = Field(default=False, description="Agreement to privacy policy")
+    date: str = Field(description="Application submission date")
 
  
 def existing_volunteer_email(session: SessionDep, email: str) -> bool:
@@ -47,7 +53,17 @@ def volunteer_not_found(session: SessionDep, volunteer_id: int) -> None:
  
 
 
-@router.post("/volunteers")
+@router.post(
+    "/",
+    status_code=status.HTTP_201_CREATED,
+    summary="Submit volunteer application",
+    description="Submit a new volunteer application. Email and phone must be unique. Privacy agreement must be accepted.",
+    responses={
+        201: {"description": "Volunteer application submitted successfully"},
+        400: {"description": "Invalid input - empty fields, missing privacy agreement, or validation errors"},
+        409: {"description": "Email or phone number already registered"}
+    }
+)
 async def create_volunteer(volunteer: Volunteer, session: SessionDep):
 
     if existing_volunteer_email(session, volunteer.email):
@@ -74,18 +90,46 @@ async def create_volunteer(volunteer: Volunteer, session: SessionDep):
     session.refresh(volunteer)
     return {"success": "Volunteer form successfully submitted"}
 
-@router.get("/volunteers/{volunteer_id}")
+@router.get(
+    "/{volunteer_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Get volunteer by ID",
+    description="Retrieve details of a specific volunteer application.",
+    responses={
+        200: {"description": "Volunteer found"},
+        404: {"description": "Volunteer not found"}
+    }
+)
 async def read_volunteer(volunteer_id: int, session: SessionDep):
     volunteer = session.get(Volunteer, volunteer_id)
     volunteer_not_found(session, volunteer_id)
     return volunteer
 
-@router.get("/volunteers")
+@router.get(
+    "/",
+    status_code=status.HTTP_200_OK,
+    summary="Get all volunteers",
+    description="Retrieve a list of all volunteer applications with their current status.",
+    responses={
+        200: {"description": "List of all volunteers"}
+    }
+)
 async def read_volunteers(session: SessionDep):
     volunteers = session.exec(select(Volunteer)).all()
     return {"volunteers": volunteers}
 
-@router.put("/volunteers/{volunteer_id}")
+@router.put(
+    "/{volunteer_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Update volunteer application",
+    description="Update an existing volunteer's information. Email and phone uniqueness will be validated if changed.",
+    responses={
+        200: {"description": "Volunteer updated successfully or no changes detected"},
+        400: {"description": "Invalid input - empty fields or validation errors"},
+        404: {"description": "Volunteer not found"},
+        409: {"description": "Email or phone number already registered to another volunteer"}
+    }
+)
 async def update_volunteer(volunteer_id: int, updated_volunteer: Volunteer, session: SessionDep):
     volunteer = session.get(Volunteer, volunteer_id)
     volunteer_not_found(session, volunteer_id)
@@ -122,7 +166,16 @@ async def update_volunteer(volunteer_id: int, updated_volunteer: Volunteer, sess
 
     return {"success": "Volunteer updated successfully"}
 
-@router.delete("/volunteers/{volunteer_id}")
+@router.delete(
+    "/{volunteer_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Delete volunteer application",
+    description="Permanently delete a volunteer application from the system. This action cannot be undone.",
+    responses={
+        200: {"description": "Volunteer deleted successfully"},
+        404: {"description": "Volunteer not found"}
+    }
+)
 async def delete_volunteer(volunteer_id: int, session: SessionDep):
     volunteer = session.get(Volunteer, volunteer_id)
 
