@@ -20,6 +20,7 @@ def create_db_and_tables() -> None:
     from app.routers.adopt import AdoptionApplication  # noqa: F401
     from app.routers.volunteer import Volunteer  # noqa: F401
     from app.routers.contact import ContactMessage  # noqa: F401
+    from app.routers.users import PawUser  # noqa: F401
 
     SQLModel.metadata.create_all(engine)
 

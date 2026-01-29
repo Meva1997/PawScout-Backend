@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, TYPE_CHECKING
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 import jwt
@@ -6,7 +6,9 @@ from jwt.exceptions import InvalidTokenError
 from sqlmodel import Session, select
 from app.auth import SECRET_KEY, ALGORITHM
 from app.database import get_session
-from app.routers.users import PawUser
+
+if TYPE_CHECKING:
+    from app.routers.users import PawUser
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
@@ -14,11 +16,14 @@ SessionDep = Annotated[Session, Depends(get_session)]
 TokenDep = Annotated[str, Depends(oauth2_scheme)]
 
 
-async def get_current_user(token: TokenDep, session: SessionDep) -> PawUser:
+async def get_current_user(token: TokenDep, session: SessionDep) -> "PawUser":
     """
     Dependency to get the current authenticated user from JWT token.
     Validates token and retrieves user from database.
     """
+    # Import here to avoid circular import
+    from app.routers.users import PawUser
+    
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -46,8 +51,8 @@ async def get_current_user(token: TokenDep, session: SessionDep) -> PawUser:
 
 
 async def get_current_admin_user(
-    current_user: Annotated[PawUser, Depends(get_current_user)]
-) -> PawUser:
+    current_user: Annotated["PawUser", Depends(get_current_user)]
+) -> "PawUser":
     """
     Dependency to verify that the current user has admin privileges.
     Use this to protect admin-only endpoints.
@@ -61,5 +66,5 @@ async def get_current_admin_user(
 
 
 # Type aliases for cleaner route definitions
-CurrentUser = Annotated[PawUser, Depends(get_current_user)]
-AdminUser = Annotated[PawUser, Depends(get_current_admin_user)]
+CurrentUser = Annotated["PawUser", Depends(get_current_user)]
+AdminUser = Annotated["PawUser", Depends(get_current_admin_user)]
