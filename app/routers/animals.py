@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 from sqlmodel import SQLModel, Field, select
-from sqlalchemy import Column, String
+from sqlalchemy import Column, String, JSON
 from sqlalchemy.dialects.postgresql import ARRAY
 from typing import List
 from enum import Enum
@@ -28,6 +28,11 @@ class Animal(SQLModel, table=True):
     goodWithDogs: bool = Field(description="Whether animal is good with other dogs")
     homeTrained: bool = Field(description="Whether animal is house trained")
     availableForAdoption: AnimalStatus = Field(default=AnimalStatus.available, description="Adoption availability status")
+    media: List[dict] | None = Field(
+        default=None,
+        sa_column=Column(JSON),
+        description="Array of media objects with url, public_id, and resource_type (image/video)"
+    )
 
 router = APIRouter(
     prefix="/animals",
