@@ -80,7 +80,10 @@ async def login_user(credentials: LoginRequest, session: SessionDep):
     db_user = session.exec(select(PawUser).where(PawUser.email == credentials.email)).first()
     
     # Verify user exists and password matches using secure hash comparison
-    if not db_user or not verify_password(credentials.password, db_user.password):
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")  
+    
+    if not verify_password(credentials.password, db_user.password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     # Generate JWT token with user info including admin status
@@ -97,15 +100,9 @@ async def login_user(credentials: LoginRequest, session: SessionDep):
     )
     
     return {
-        "access_token": access_token, # the JWT token contains the isAdmin claim
+        "access_token": access_token,  # JWT contains: email, user_id, isAdmin, name, lastName
         "token_type": "bearer",
-        "user": {
-            "id": db_user.id,
-            "email": db_user.email,
-            "name": db_user.name,
-            "lastName": db_user.lastName,
-            "isAdmin": db_user.isAdmin
-        }
+        "success": "Login successful"
     }
 
 
