@@ -8,12 +8,13 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
 from pydantic import BaseModel
+import os
 
 # to get a string like this run:
 # openssl rand -hex 32
-SECRET_KEY = "269565aafbe41790a7506142d6fcd247ad95ed1336b2a3d907525d087627bdd8"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+SECRET_KEY = os.getenv("AUTH_SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))  # 14 days
 
 fake_users_db = {
     "johndoe": {
