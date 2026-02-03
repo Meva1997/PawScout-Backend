@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import EmailStr
 from sqlmodel import SQLModel, Field, select
 from app.database import SessionDep
+from app.dependencies import AdminUser
 from app.routers.animals import Animal
 
 
@@ -79,13 +80,15 @@ async def submit_adoption_application(
     "/{application_id}",
     status_code=status.HTTP_200_OK,
     summary="Get adoption application by ID",
-    description="Retrieve details of a specific adoption application.",
+    description="Retrieve details of a specific adoption application. Requires admin privileges.",
     responses={
         200: {"description": "Application found"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"},
         404: {"description": "Application not found"}
     }
 )
-async def get_adoption_application(application_id: int, session: SessionDep):
+async def get_adoption_application(application_id: int, session: SessionDep, admin: AdminUser):
     application = session.get(AdoptionApplication, application_id)
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -95,12 +98,14 @@ async def get_adoption_application(application_id: int, session: SessionDep):
     "/",
     status_code=status.HTTP_200_OK,
     summary="Get all adoption applications",
-    description="Retrieve a list of all adoption applications submitted to the system.",
+    description="Retrieve a list of all adoption applications submitted to the system. Requires admin privileges.",
     responses={
-        200: {"description": "List of all adoption applications"}
+        200: {"description": "List of all adoption applications"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"}
     }
 )
-async def get_adoption_applications(session: SessionDep):
+async def get_adoption_applications(session: SessionDep, admin: AdminUser):
     applications = session.exec(select(AdoptionApplication)).all()
     return {"applications": applications}
 
@@ -108,13 +113,15 @@ async def get_adoption_applications(session: SessionDep):
     "/{application_id}",
     status_code=status.HTTP_200_OK,
     summary="Delete adoption application",
-    description="Permanently delete an adoption application from the system. This action cannot be undone.",
+    description="Permanently delete an adoption application from the system. This action cannot be undone. Requires admin privileges.",
     responses={
         200: {"description": "Application deleted successfully"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"},
         404: {"description": "Application not found"}
     }
 )
-async def delete_adoption_application(application_id: int, session: SessionDep):
+async def delete_adoption_application(application_id: int, session: SessionDep, admin: AdminUser):
     application = session.get(AdoptionApplication, application_id)
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")

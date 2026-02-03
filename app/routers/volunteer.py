@@ -6,6 +6,7 @@ from sqlalchemy import Column, String
 from sqlalchemy.dialects.postgresql import ARRAY
 from enum import Enum
 from app.database import SessionDep
+from app.dependencies import AdminUser
 
 router = APIRouter(
     prefix="/volunteer",
@@ -94,13 +95,15 @@ async def create_volunteer(volunteer: Volunteer, session: SessionDep):
     "/{volunteer_id}",
     status_code=status.HTTP_200_OK,
     summary="Get volunteer by ID",
-    description="Retrieve details of a specific volunteer application.",
+    description="Retrieve details of a specific volunteer application. Requires admin privileges.",
     responses={
         200: {"description": "Volunteer found"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"},
         404: {"description": "Volunteer not found"}
     }
 )
-async def read_volunteer(volunteer_id: int, session: SessionDep):
+async def read_volunteer(volunteer_id: int, session: SessionDep, admin: AdminUser):
     volunteer = session.get(Volunteer, volunteer_id)
     volunteer_not_found(session, volunteer_id)
     return volunteer
@@ -109,12 +112,14 @@ async def read_volunteer(volunteer_id: int, session: SessionDep):
     "/",
     status_code=status.HTTP_200_OK,
     summary="Get all volunteers",
-    description="Retrieve a list of all volunteer applications with their current status.",
+    description="Retrieve a list of all volunteer applications with their current status. Requires admin privileges.",
     responses={
-        200: {"description": "List of all volunteers"}
+        200: {"description": "List of all volunteers"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"}
     }
 )
-async def read_volunteers(session: SessionDep):
+async def read_volunteers(session: SessionDep, admin: AdminUser):
     volunteers = session.exec(select(Volunteer)).all()
     return {"volunteers": volunteers}
 
@@ -122,15 +127,17 @@ async def read_volunteers(session: SessionDep):
     "/{volunteer_id}",
     status_code=status.HTTP_200_OK,
     summary="Update volunteer application",
-    description="Update an existing volunteer's information. Email and phone uniqueness will be validated if changed.",
+    description="Update an existing volunteer's information. Email and phone uniqueness will be validated if changed. Requires admin privileges.",
     responses={
         200: {"description": "Volunteer updated successfully or no changes detected"},
         400: {"description": "Invalid input - empty fields or validation errors"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"},
         404: {"description": "Volunteer not found"},
         409: {"description": "Email or phone number already registered to another volunteer"}
     }
 )
-async def update_volunteer(volunteer_id: int, updated_volunteer: Volunteer, session: SessionDep):
+async def update_volunteer(volunteer_id: int, updated_volunteer: Volunteer, session: SessionDep, admin: AdminUser):
     volunteer = session.get(Volunteer, volunteer_id)
     volunteer_not_found(session, volunteer_id)
 
@@ -170,13 +177,15 @@ async def update_volunteer(volunteer_id: int, updated_volunteer: Volunteer, sess
     "/{volunteer_id}",
     status_code=status.HTTP_200_OK,
     summary="Delete volunteer application",
-    description="Permanently delete a volunteer application from the system. This action cannot be undone.",
+    description="Permanently delete a volunteer application from the system. This action cannot be undone. Requires admin privileges.",
     responses={
         200: {"description": "Volunteer deleted successfully"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"},
         404: {"description": "Volunteer not found"}
     }
 )
-async def delete_volunteer(volunteer_id: int, session: SessionDep):
+async def delete_volunteer(volunteer_id: int, session: SessionDep, admin: AdminUser):
     volunteer = session.get(Volunteer, volunteer_id)
 
     volunteer_not_found(session, volunteer_id)

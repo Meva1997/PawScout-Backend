@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from typing import List
 from enum import Enum
 from app.database import SessionDep
+from app.dependencies import AdminUser
 
 
 class AnimalStatus(str, Enum):
@@ -75,13 +76,15 @@ async def read_animal(animal_id: int, session: SessionDep):
     "/",
     status_code=status.HTTP_201_CREATED,
     summary="Create a new animal listing",
-    description="Add a new animal to the adoption system. All fields except 'id' and 'availableForAdoption' are required.",
+    description="Add a new animal to the adoption system. All fields except 'id' and 'availableForAdoption' are required. Requires admin privileges.",
     responses={
         201: {"description": "Animal created successfully"},
-        400: {"description": "Invalid input - empty fields or validation errors"}
+        400: {"description": "Invalid input - empty fields or validation errors"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"}
     }
 )
-async def create_animal(animal: Animal, session: SessionDep): 
+async def create_animal(animal: Animal, session: SessionDep, admin: AdminUser): 
 
     for field, value in animal.dict().items():
         if field == "id": 
@@ -103,14 +106,16 @@ async def create_animal(animal: Animal, session: SessionDep):
     "/{animal_id}",
     status_code=status.HTTP_200_OK,
     summary="Update an existing animal",
-    description="Update all information for an existing animal. Requires all fields to be provided.",
+    description="Update all information for an existing animal. Requires all fields to be provided. Requires admin privileges.",
     responses={
         200: {"description": "Animal updated successfully"},
         400: {"description": "Invalid input - empty fields or validation errors"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"},
         404: {"description": "Animal not found"}
     }
 )
-async def update_animal(animal_id: int, updated_animal: Animal, session: SessionDep):
+async def update_animal(animal_id: int, updated_animal: Animal, session: SessionDep, admin: AdminUser):
     animal = session.get(Animal, animal_id)
     if not animal:
         raise HTTPException(status_code=404, detail="Animal not found")
@@ -134,13 +139,15 @@ async def update_animal(animal_id: int, updated_animal: Animal, session: Session
     "/{animal_id}",
     status_code=status.HTTP_200_OK,
     summary="Delete an animal",
-    description="Permanently remove an animal from the system. This action cannot be undone.",
+    description="Permanently remove an animal from the system. This action cannot be undone. Requires admin privileges.",
     responses={
         200: {"description": "Animal deleted successfully"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"},
         404: {"description": "Animal not found"}
     }
 )
-async def delete_animal(animal_id: int, session: SessionDep):
+async def delete_animal(animal_id: int, session: SessionDep, admin: AdminUser):
     animal = session.get(Animal, animal_id)
     if not animal:
         raise HTTPException(status_code=404, detail="Animal not found")
