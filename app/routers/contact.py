@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from sqlmodel import SQLModel, Field, select
 from app.database import SessionDep
+from app.dependencies import AdminUser
  
 router = APIRouter(
     prefix="/contact",
@@ -47,13 +48,15 @@ async def send_contact_message(contact_message: ContactMessage, session: Session
     "/{message_id}",
     status_code=status.HTTP_200_OK,
     summary="Get contact message by ID",
-    description="Retrieve a specific contact message by its ID.",
+    description="Retrieve a specific contact message by its ID. Requires admin privileges.",
     responses={
         200: {"description": "Contact message found"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"},
         404: {"description": "Contact message not found"}
     }
 )
-async def get_contact_message(message_id: int, session: SessionDep):
+async def get_contact_message(message_id: int, session: SessionDep, admin: AdminUser):
     contact_message = session.get(ContactMessage, message_id)
     if not contact_message:
         raise HTTPException(status_code=404, detail="Contact message not found")
@@ -63,12 +66,14 @@ async def get_contact_message(message_id: int, session: SessionDep):
     "/",
     status_code=status.HTTP_200_OK,
     summary="Get all contact messages",
-    description="Retrieve all contact messages submitted through the contact form.",
+    description="Retrieve all contact messages submitted through the contact form. Requires admin privileges.",
     responses={
-        200: {"description": "List of all contact messages"}
+        200: {"description": "List of all contact messages"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"}
     }
 )
-async def get_all_contact_messages(session: SessionDep):
+async def get_all_contact_messages(session: SessionDep, admin: AdminUser):
     messages = session.exec(select(ContactMessage)).all()
     return {"contact_messages": messages}
 
@@ -76,13 +81,15 @@ async def get_all_contact_messages(session: SessionDep):
     "/{message_id}",
     status_code=status.HTTP_200_OK,
     summary="Delete contact message",
-    description="Permanently delete a contact message from the system. This action cannot be undone.",
+    description="Permanently delete a contact message from the system. This action cannot be undone. Requires admin privileges.",
     responses={
         200: {"description": "Contact message deleted successfully"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"},
         404: {"description": "Contact message not found"}
     }
 )
-async def delete_contact_message(message_id: int, session: SessionDep):
+async def delete_contact_message(message_id: int, session: SessionDep, admin: AdminUser):
     contact_message = session.get(ContactMessage, message_id)
     if not contact_message:
         raise HTTPException(status_code=404, detail="Contact message not found")
