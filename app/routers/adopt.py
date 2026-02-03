@@ -24,6 +24,8 @@ class AdoptionApplication(SQLModel, table=True):
     city: str = Field(min_length=2, max_length=100, description="City")
     state: str = Field(min_length=2, max_length=100, description="State or province")
     zipCode: str = Field(min_length=3, max_length=20, description="Postal/ZIP code")
+    birthdate: str = Field(description="Applicant's birthdate")
+    occupation: str = Field(min_length=2, max_length=100, description="Applicant's occupation")
     reasonForAdoption: str = Field(min_length=10, max_length=1000, description="Reason for wanting to adopt")
     experienceWithPets: str = Field(min_length=5, max_length=1000, description="Previous experience with pets")
     homeType: str = Field(min_length=2, max_length=50, description="Type of home (apartment, house, etc.)")
@@ -31,7 +33,7 @@ class AdoptionApplication(SQLModel, table=True):
     agreeToTerms: bool = Field(description="Agreement to terms and conditions")
     date: str = Field(description="Application submission date")
 
-
+ 
 @router.post(
     "/{animal_id}",
     status_code=status.HTTP_201_CREATED,
