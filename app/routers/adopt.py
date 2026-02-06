@@ -33,6 +33,7 @@ class AdoptionApplication(SQLModel, table=True):
     whoLivesInHouse: str = Field(min_length=1, max_length=500, description="Who lives in the household")
     agreeToTerms: bool = Field(description="Agreement to terms and conditions")
     date: str = Field(description="Application submission date")
+    status: str = Field(default="pending", description="Application status (pending, approved, rejected)")
 
  
 @router.post(
@@ -60,7 +61,7 @@ async def submit_adoption_application(
         raise HTTPException(status_code=409, detail="Animal is already in adoption process")
 
     for field, value in application.dict().items():
-        if field in ["id", "animalId"]:
+        if field in ["id", "animalId", "status"]:
             continue
 
         if isinstance(value, str) and value.strip() == "":
@@ -70,6 +71,7 @@ async def submit_adoption_application(
     animal.availableForAdoption = "pending"
     session.add(animal)
 
+    application.status = "pending"
     session.add(application)
     session.commit()
     session.refresh(application)

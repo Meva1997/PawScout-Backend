@@ -184,7 +184,7 @@ async def delete_user(user_id: int, admin: AdminUser, session: SessionDep):
 async def get_all_adoptions(admin: AdminUser, session: SessionDep):
     """Get all adoption applications with full details. Admin only endpoint."""
     adoptions = session.exec(select(AdoptionApplication)).all()
-    return adoptions
+    return {"requests": adoptions}
 
 
 @router.get(
