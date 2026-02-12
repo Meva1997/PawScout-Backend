@@ -4,13 +4,24 @@ from app.routers import animals, volunteer, contact, adopt, users, subs
 from app.cloudinary.routers import media
 from app.internal import admin
 from app.database import create_db_and_tables
+from dotenv import load_dotenv
+import os
 
 app = FastAPI()
 
 # Configure CORS
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+# Add production frontend URL if available
+if os.getenv("FRONTEND_URL"):
+    origins.append(os.getenv("FRONTEND_URL"))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
