@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Body
 from pydantic import EmailStr
 from sqlmodel import SQLModel, Field, select
 from app.database import SessionDep
 from app.dependencies import AdminUser
-from app.routers.animals import Animal
+from app.routers.animals import Animal, AnimalStatus
+from enum import Enum
+
 
 
 
@@ -11,6 +13,12 @@ router = APIRouter(
     prefix="/adopt",
     tags=["adopt"],
 )
+
+class AdoptionStatus(str, Enum):
+    """Status options for animal adoption availability."""
+    approved = "approved"
+    pending = "pending"
+    rejected = "rejected"
 
 
 class AdoptionApplication(SQLModel, table=True):
@@ -33,7 +41,7 @@ class AdoptionApplication(SQLModel, table=True):
     whoLivesInHouse: str = Field(min_length=1, max_length=500, description="Who lives in the household")
     agreeToTerms: bool = Field(description="Agreement to terms and conditions")
     date: str = Field(description="Application submission date")
-    status: str = Field(default="pending", description="Application status (pending, approved, rejected)")
+    status: AdoptionStatus = Field(default=AdoptionStatus.pending, description="Application status (pending, approved, rejected)")
 
  
 @router.post(
@@ -45,7 +53,7 @@ class AdoptionApplication(SQLModel, table=True):
         201: {"description": "Adoption application submitted successfully"},
         400: {"description": "Invalid input - empty fields or validation errors"},
         404: {"description": "Animal not found"},
-        409: {"description": "Animal already in adoption process (pending or adopted)"}
+        409: {"description": "Animal already in adoption process (pending or approved)"}
     }
 )
 async def submit_adoption_application(
@@ -57,7 +65,7 @@ async def submit_adoption_application(
     if not animal:
         raise HTTPException(status_code=404, detail="Animal not found")
 
-    if animal.availableForAdoption in ["pending", "adopted"]:
+    if animal.availableForAdoption in [AnimalStatus.pending, AnimalStatus.adopted]:
         raise HTTPException(status_code=409, detail="Animal is already in adoption process")
 
     for field, value in application.dict().items():
@@ -68,10 +76,10 @@ async def submit_adoption_application(
                 raise HTTPException(status_code=400, detail=f"{field} cannot be empty")
 
     # Set animal status to pending
-    animal.availableForAdoption = "pending"
+    animal.availableForAdoption = AdoptionStatus.pending
     session.add(animal)
 
-    application.status = "pending"
+    application.status = AdoptionStatus.pending
     session.add(application)
     session.commit()
     session.refresh(application)
@@ -128,6 +136,56 @@ async def delete_adoption_application(application_id: int, session: SessionDep, 
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
 
+    # Check if the application was rejected or pending before deleting, if so set the animal's status back to available
+    if application.status in [AdoptionStatus.rejected, AdoptionStatus.pending]:
+        animal = session.get(Animal, application.animalId)
+        if animal:
+            animal.availableForAdoption = AnimalStatus.available
+            session.add(animal)
+
     session.delete(application)
     session.commit()
     return {"success": "Adoption application deleted successfully"}
+
+@router.put(
+    "/{application_id}/status",
+    status_code=status.HTTP_200_OK,
+    summary="Update adoption application status",
+    description="Update the status of an adoption application (approved, pending, rejected). Requires admin privileges.",
+    responses={
+        200: {"description": "Application status updated successfully"},
+        400: {"description": "Invalid input - empty fields or validation errors"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        403: {"description": "Forbidden - Admin privileges required"},
+        404: {"description": "Application not found"}
+    }
+)
+async def update_adoption_application_status(
+    application_id: int,
+    new_status: AdoptionStatus = Body(..., embed=True, alias="status"),
+    session: SessionDep = None,
+    admin: AdminUser = None,
+):
+    application = session.get(AdoptionApplication, application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    animal = session.get(Animal, application.animalId)
+    if not animal:
+        raise HTTPException(status_code=404, detail="Associated animal not found")
+
+    application.status = new_status
+
+    if new_status == AdoptionStatus.approved:
+        animal.availableForAdoption = AnimalStatus.adopted
+    elif new_status == AdoptionStatus.pending:
+        animal.availableForAdoption = AnimalStatus.pending
+    elif new_status == AdoptionStatus.rejected:
+        animal.availableForAdoption = AnimalStatus.available
+
+    session.add(application)
+    session.add(animal)
+    session.commit()
+    session.refresh(application)
+
+    return {"success": "Adoption application status updated successfully"}
