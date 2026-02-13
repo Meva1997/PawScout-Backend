@@ -13,11 +13,16 @@ app = FastAPI()
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:5173",  # Vite dev server
 ]
 
 # Add production frontend URL if available
-if os.getenv("FRONTEND_URL"):
-    origins.append(os.getenv("FRONTEND_URL"))
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    origins.append(frontend_url)
+    # Also add without trailing slash if it has one
+    if frontend_url.endswith("/"):
+        origins.append(frontend_url.rstrip("/"))
 
 app.add_middleware(
     CORSMiddleware,
