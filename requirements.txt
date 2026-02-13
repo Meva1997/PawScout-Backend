@@ -1,7 +1,7 @@
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
 sqlmodel==0.0.22
-pydantic==2.10.3
+pydantic==2.10.1
 pydantic-settings==2.6.1
 python-dotenv==1.0.1
 python-multipart==0.0.18
@@ -10,3 +10,4 @@ pwdlib[argon2]==0.2.1
 cloudinary==1.41.0
 psycopg2-binary==2.9.10
 email-validator==2.2.0
+gunicorn==21.2.0
