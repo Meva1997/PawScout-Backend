@@ -1,3 +1,3 @@
 #!/bin/bash
-# Render start script
-uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Render start script - usando gunicorn con uvicorn workers para producción
+gunicorn app.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8000}
