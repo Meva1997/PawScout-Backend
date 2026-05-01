@@ -1,30 +1,15 @@
 from typing import List
-from fastapi import APIRouter, HTTPException, UploadFile, File, status
-from pydantic import BaseModel
-from app.cloudinary_config import upload_media, delete_media
-from app.dependencies import AdminUser
+
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
+
+from app.core.cloudinary import delete_media, upload_media
+from app.core.deps import AdminUser
+from app.schemas.media import MediaDeleteRequest, MediaUploadResponse
 
 router = APIRouter(
     prefix="/media",
     tags=["media"],
 )
-
-
-class MediaUploadResponse(BaseModel):
-    """Response model for media upload."""
-    url: str
-    public_id: str
-    resource_type: str
-    format: str
-    width: int | None = None
-    height: int | None = None
-    bytes: int | None = None
-
-
-class MediaDeleteRequest(BaseModel):
-    """Request model for media deletion."""
-    public_id: str
-    resource_type: str = "image"  # 'image' or 'video'
 
 
 @router.post(
@@ -54,19 +39,19 @@ async def upload_media_file(
         "image/jpeg", "image/png", "image/gif", "image/webp",
         "video/mp4", "video/quicktime", "video/x-msvideo"
     ]
-    
+
     if file.content_type not in allowed_types:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid file type. Allowed: images (jpg, png, gif, webp) and videos (mp4, mov, avi)"
         )
-    
+
     # Determine resource type
     resource_type = "video" if file.content_type.startswith("video/") else "image"
-    
+
     # Upload to Cloudinary
     result = await upload_media(file, folder="pawscout/animals", resource_type=resource_type)
-    
+
     return MediaUploadResponse(**result)
 
 
@@ -94,29 +79,29 @@ async def upload_multiple_media(
     """
     if len(files) > 10:
         raise HTTPException(status_code=400, detail="Maximum 10 files per upload")
-    
+
     results = []
-    
+
     for file in files:
         # Validate file type
         allowed_types = [
             "image/jpeg", "image/png", "image/gif", "image/webp",
             "video/mp4", "video/quicktime", "video/x-msvideo"
         ]
-        
+
         if file.content_type not in allowed_types:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid file type in '{file.filename}'. Allowed: images and videos"
             )
-        
+
         # Determine resource type
         resource_type = "video" if file.content_type.startswith("video/") else "image"
-        
+
         # Upload to Cloudinary
         result = await upload_media(file, folder="pawscout/animals", resource_type=resource_type)
         results.append(MediaUploadResponse(**result))
-    
+
     return results
 
 

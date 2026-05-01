@@ -1,11 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import animals, volunteer, contact, adopt, users, subs
-from app.cloudinary.routers import media
-from app.internal import admin
-from app.database import create_db_and_tables
-from dotenv import load_dotenv
-import os
+
+from app.config import settings
+from app.routers import adopt, admin, animals, contact, media, subs, users, volunteer
 
 app = FastAPI()
 
@@ -17,12 +14,11 @@ origins = [
 ]
 
 # Add production frontend URL if available
-frontend_url = os.getenv("FRONTEND_URL")
-if frontend_url:
-    origins.append(frontend_url)
+if settings.FRONTEND_URL:
+    origins.append(settings.FRONTEND_URL)
     # Also add without trailing slash if it has one
-    if frontend_url.endswith("/"):
-        origins.append(frontend_url.rstrip("/"))
+    if settings.FRONTEND_URL.endswith("/"):
+        origins.append(settings.FRONTEND_URL.rstrip("/"))
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,11 +27,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    create_db_and_tables()
 
 
 app.include_router(animals.router)

@@ -1,16 +1,13 @@
 from fastapi import APIRouter, HTTPException, status
-from sqlmodel import SQLModel, Field, select
-from app.database import SessionDep 
+from sqlmodel import select
 
+from app.database import SessionDep
+from app.models import Subscription
 
 router = APIRouter(
     prefix="/subs",
     tags=["subs"],
 )
-
-class Subscription(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    email: str = Field(min_length=1, max_length=100, description="Subscriber's email address")
 
 
 @router.post(

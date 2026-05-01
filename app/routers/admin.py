@@ -1,13 +1,18 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, status
-from sqlmodel import select
 from datetime import datetime
-from app.dependencies import AdminUser, SessionDep
-from app.routers.users import PawUser
-from app.routers.animals import Animal
-from app.routers.adopt import AdoptionApplication
-from app.routers.volunteer import Volunteer
-from app.cloudinary_config import upload_media, delete_media
-from app.models.settings import ShelterSettings, ShelterSettingsUpdate
+
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from sqlmodel import select
+
+from app.core.cloudinary import delete_media, upload_media
+from app.core.deps import AdminUser, SessionDep
+from app.models import (
+    AdoptionApplication,
+    Animal,
+    PawUser,
+    ShelterSettings,
+    Volunteer,
+)
+from app.schemas.settings import ShelterSettingsUpdate
 
 router = APIRouter(
     prefix="/admin",
@@ -35,7 +40,7 @@ async def get_admin_dashboard(admin: AdminUser, session: SessionDep):
     total_animals = len(session.exec(select(Animal)).all())
     total_adoptions = len(session.exec(select(AdoptionApplication)).all())
     total_volunteers = len(session.exec(select(Volunteer)).all())
-    
+
     return {
         "message": f"Welcome to admin dashboard, {admin.name}!",
         "stats": {
@@ -88,15 +93,15 @@ async def promote_user_to_admin(user_id: int, admin: AdminUser, session: Session
     user = session.get(PawUser, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     if user.isAdmin:
         raise HTTPException(status_code=400, detail="User is already an admin")
-    
+
     user.isAdmin = True
     session.add(user)
     session.commit()
     session.refresh(user)
-    
+
     return {
         "message": f"User {user.email} promoted to admin successfully",
         "user": {
@@ -124,19 +129,19 @@ async def demote_admin_to_user(user_id: int, admin: AdminUser, session: SessionD
     user = session.get(PawUser, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     if not user.isAdmin:
         raise HTTPException(status_code=400, detail="User is not an admin")
-    
+
     # Prevent demoting yourself
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Cannot demote yourself")
-    
+
     user.isAdmin = False
     session.add(user)
     session.commit()
     session.refresh(user)
-    
+
     return {
         "message": f"Admin privileges removed from {user.email}",
         "user": {
@@ -164,14 +169,14 @@ async def delete_user(user_id: int, admin: AdminUser, session: SessionDep):
     user = session.get(PawUser, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Prevent deleting yourself
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
-    
+
     session.delete(user)
     session.commit()
-    
+
     return {"message": f"User {user.email} deleted successfully"}
 
 
@@ -223,17 +228,17 @@ async def post_shelter_logo(
     """Upload the shelter's logo to Cloudinary and save to database. Admin only endpoint."""
     # Validate file type - only accept images
     allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
-    
+
     if file.content_type not in allowed_types:
         raise HTTPException(
             status_code=400,
             detail="Invalid file type. Allowed: jpg, png, gif, webp"
         )
-    
+
     # Get existing settings (should be only one record)
     statement = select(ShelterSettings)
     existing_settings = session.exec(statement).first()
-    
+
     # If there's an old logo, delete it from Cloudinary
     if existing_settings and existing_settings.logo_public_id:
         try:
@@ -241,10 +246,10 @@ async def post_shelter_logo(
         except Exception:
             # Continue even if deletion fails
             pass
-    
+
     # Upload new logo to Cloudinary
     result = await upload_media(file, folder="pawscout/settings", resource_type="image")
-    
+
     # Update or create settings record
     if existing_settings:
         existing_settings.logo_url = result["url"]
@@ -257,10 +262,10 @@ async def post_shelter_logo(
             logo_public_id=result["public_id"]
         )
         session.add(new_settings)
-    
+
     session.commit()
     session.refresh(existing_settings if existing_settings else new_settings)
-    
+
     return {
         "message": "Shelter logo uploaded and saved successfully",
         "logo_url": result["url"],
@@ -281,10 +286,10 @@ async def get_shelter_logo(session: SessionDep):
     """Get the current shelter logo URL. Public endpoint."""
     statement = select(ShelterSettings)
     settings = session.exec(statement).first()
-    
+
     if not settings or not settings.logo_url:
         raise HTTPException(status_code=404, detail="Shelter logo not found")
-    
+
     return {"logo_url": settings.logo_url}
 
 @router.get(
@@ -301,7 +306,7 @@ async def get_shelter_settings(session: SessionDep):
     """Get current shelter settings. Public endpoint."""
     statement = select(ShelterSettings)
     settings = session.exec(statement).first()
-    
+
     if not settings:
         # Return default settings if none exist
         return {
@@ -314,7 +319,7 @@ async def get_shelter_settings(session: SessionDep):
             "state": None,
             "zip_code": None
         }
-    
+
     return settings
 
 
@@ -338,7 +343,7 @@ async def update_shelter_settings(
     # Get existing settings
     statement = select(ShelterSettings)
     existing_settings = session.exec(statement).first()
-    
+
     # If no settings exist, create new record
     if not existing_settings:
         new_settings = ShelterSettings(
@@ -358,10 +363,10 @@ async def update_shelter_settings(
             "message": "La configuración del refugio se ha creado exitosamente",
             "settings": new_settings
         }
-    
+
     # Update only provided fields
     update_data = settings_update.model_dump(exclude_unset=True)
-    
+
     # Check if any field has actually changed
     has_changes = False
     for field, value in update_data.items():
@@ -369,24 +374,24 @@ async def update_shelter_settings(
         if current_value != value:
             has_changes = True
             break
-    
+
     # If no changes detected, return early
     if not has_changes:
         return {
             "message": "No se detectaron cambios. Los datos son idénticos a los actuales.",
             "settings": existing_settings
         }
-    
+
     # Apply updates
     for field, value in update_data.items():
         setattr(existing_settings, field, value)
-    
+
     existing_settings.updated_at = datetime.utcnow()
-    
+
     session.add(existing_settings)
     session.commit()
     session.refresh(existing_settings)
-    
+
     return {
         "message": "La configuración del refugio se ha actualizado exitosamente",
         "settings": existing_settings
