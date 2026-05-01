@@ -1,44 +1,16 @@
-from typing import List
 from fastapi import APIRouter, HTTPException, status
-from pydantic import EmailStr
-from sqlmodel import SQLModel, Field, select
-from sqlalchemy import Column, String
-from sqlalchemy.dialects.postgresql import ARRAY
-from enum import Enum
+from sqlmodel import select
+
+from app.core.deps import AdminUser
 from app.database import SessionDep
-from app.dependencies import AdminUser
+from app.models import Volunteer
 
 router = APIRouter(
     prefix="/volunteer",
     tags=["volunteer"],
 )
 
-class VolunteerStatus(str, Enum):
-    """Status options for volunteer applications."""
-    pending = "pending"
-    accepted = "accepted"
-    rejected = "rejected"
 
-
-class Volunteer(SQLModel, table=True):
-    """Volunteer application model for managing volunteer registrations."""
-    id: int | None = Field(default=None, primary_key=True, index=True, unique=True)
-    name: str = Field(min_length=1, max_length=100, description="Volunteer's first name")
-    lastName: str = Field(min_length=1, max_length=100, description="Volunteer's last name")
-    email: EmailStr = Field(index=True, unique=True, description="Volunteer's email address")
-    phone: str = Field(min_length=7, max_length=20, description="Volunteer's phone number")
-    availability: List[str] = Field(sa_column=Column(ARRAY(String)), description="Time availability (e.g., weekdays, weekends)")
-    availableDays: List[str] = Field(sa_column=Column(ARRAY(String)), description="Specific days available")
-    areasOfInterest: List[str] = Field(sa_column=Column(ARRAY(String)), description="Areas of interest for volunteering")
-    whyVolunteer: str = Field(min_length=10, max_length=1000, description="Reason for wanting to volunteer")
-    specialSkills: str = Field(min_length=1, max_length=500, description="Special skills or qualifications")
-    emergencyContactName: str = Field(min_length=1, max_length=100, description="Emergency contact name")
-    emergencyContactPhone: str = Field(min_length=7, max_length=20, description="Emergency contact phone number")
-    status: VolunteerStatus = Field(default=VolunteerStatus.pending, description="Application status")
-    privacyAgreement: bool = Field(default=False, description="Agreement to privacy policy")
-    date: str = Field(description="Application submission date")
-
- 
 def existing_volunteer_email(session: SessionDep, email: str) -> bool:
     volunteer = session.exec(select(Volunteer).where(Volunteer.email == email)).first()
     return volunteer is not None
@@ -51,7 +23,7 @@ def volunteer_not_found(session: SessionDep, volunteer_id: int) -> None:
     volunteer = session.get(Volunteer, volunteer_id)
     if not volunteer:
         raise HTTPException(status_code=404, detail="Volunteer not found")
- 
+
 
 
 @router.post(
@@ -82,7 +54,7 @@ async def create_volunteer(volunteer: Volunteer, session: SessionDep):
 
         if isinstance(value, list) and len(value) == 0:
                 raise HTTPException(status_code=400, detail=f"{field} cannot be empty")
-        
+
         if field == "privacyAgreement" and value is not True:
                 raise HTTPException(status_code=400, detail="You must agree to the privacy policy")
 
@@ -144,7 +116,7 @@ async def update_volunteer(volunteer_id: int, updated_volunteer: Volunteer, sess
     if volunteer.email != updated_volunteer.email:
         if existing_volunteer_email(session, updated_volunteer.email):
             raise HTTPException(status_code=409, detail="Email already registered")
-    
+
     if volunteer.phone != updated_volunteer.phone:
         if existing_voluneer_phone(session, updated_volunteer.phone):
             raise HTTPException(status_code=409, detail="Phone number already registered")
@@ -163,7 +135,7 @@ async def update_volunteer(volunteer_id: int, updated_volunteer: Volunteer, sess
         if getattr(volunteer, field) != value:
             setattr(volunteer, field, value) # setattr to update fields
             changes_made = True
-        
+
     if not changes_made:
         return {"message": "No changes detected"}
 

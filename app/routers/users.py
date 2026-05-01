@@ -1,30 +1,23 @@
 from datetime import timedelta
+
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field as PydanticField
-from sqlmodel import SQLModel, Field, select
+from sqlmodel import select
+
+from app.core.deps import CurrentUser
+from app.core.security import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    create_access_token,
+    get_password_hash,
+    verify_password,
+)
 from app.database import SessionDep
-from app.auth import get_password_hash, verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
-from app.dependencies import CurrentUser
+from app.models import PawUser
+from app.schemas.user import LoginRequest
 
 router = APIRouter(
     prefix="/users",
     tags=["users"],
 )
-
-class PawUser(SQLModel, table=True):
-    """User model for authentication and authorization."""
-    id: int | None = Field(default=None, primary_key=True)
-    email: EmailStr = Field(index=True, unique=True, description="User's email address")
-    name: str = Field(min_length=1, max_length=100, description="User's first name")
-    lastName: str = Field(min_length=1, max_length=100, description="User's last name")
-    password: str = Field(min_length=8, description="Hashed password")
-    isAdmin: bool = Field(default=False, description="Whether user has admin privileges")
-
-
-class LoginRequest(BaseModel):
-    """Login credentials schema."""
-    email: EmailStr = PydanticField(description="User's email address")
-    password: str = PydanticField(min_length=1, description="User's password")
 
 
 @router.post(
@@ -58,7 +51,7 @@ async def register_user(paw_user: PawUser, session: SessionDep):
     session.refresh(paw_user)
     return {"success": "User registered successfully"}
 
-    
+
 
 @router.post(
     "/login",
@@ -75,17 +68,17 @@ async def login_user(credentials: LoginRequest, session: SessionDep):
     # Validate credentials are not empty
     if not credentials.email.strip() or not credentials.password.strip():
         raise HTTPException(status_code=400, detail="Email and password cannot be empty")
-    
+
     # Find user by email
     db_user = session.exec(select(PawUser).where(PawUser.email == credentials.email)).first()
-    
+
     # Verify user exists and password matches using secure hash comparison
     if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")  
-    
+        raise HTTPException(status_code=404, detail="User not found")
+
     if not verify_password(credentials.password, db_user.password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    
+
     # Generate JWT token with user info including admin status
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -98,7 +91,7 @@ async def login_user(credentials: LoginRequest, session: SessionDep):
         },
         expires_delta=access_token_expires
     )
-    
+
     return {
         "access_token": access_token,  # JWT contains: email, user_id, isAdmin, name, lastName
         "token_type": "bearer",
@@ -141,7 +134,7 @@ async def get_user(user_id: int, session: SessionDep):
     user = session.get(PawUser, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Return user without password
     return {
         "id": user.id,
